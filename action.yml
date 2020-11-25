@@ -1,0 +1,27 @@
+name: 'Validate tag and obtain semver from it'
+description: 'Validates the tag of a release follows the semver standard (with v prefix) and dumps the unprefixed version as the value of env var SEMVER. If release is a prerelease, it appends `-pre` to said env var.'
+author: "Roberto Santalla <rsantalla@newrelic.com>"
+inputs:
+  tag:
+    description: 'Tag to use. Defaults to the current tag being released'
+    required: false
+    default: ${{ github.event.release.tag_name }}
+  presuffix:
+    description: 'Suffix to append to version if release is a prerelease. Dash is added automatically.'
+    required: false
+    default: "pre"
+runs:
+  using: composite
+  steps:
+    - name: Check if running on a release
+      shell: bash
+      run: |
+        SEMVER=$(echo "${{ inputs.tag }}" | grep -oE '^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$')
+        echo "SEMVER=${SEMVER#v}" >> $GITHUB_ENV
+    - name: Append suffix to prereleases
+      shell: bash
+      env:
+        PRERELEASE: ${{ github.event.release.prerelease }}
+      run: |
+        [[ $PRERELEASE == "" || $PRERELEASE == "false" ]] && exit 0
+        echo "$SEMVER" | grep -E '\-${{ inputs.presuffix }}$' || echo "SEMVER=$SEMVER-${{ inputs.presuffix }}" >> $GITHUB_ENV
